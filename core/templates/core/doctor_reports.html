@@ -14,6 +14,9 @@
         <a href="{% url 'doctor_submit' %}" class="btn btn-primary btn-lg">
             <i class="fa-solid fa-plus-circle me-2"></i> New Sample Request
         </a>
+        <a href="{% url 'export_doctor_csv' %}" class="btn btn-outline-info btn-lg ms-2">
+            <i class="fa-solid fa-download me-2"></i> Export CSV
+        </a>
     </div>
 
     {% if messages %}
@@ -29,14 +32,19 @@
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for request in requests %}
             <div class="col">
-                <div class="card h-100 shadow-sm border-0 overflow-hidden" 
+                <div class="card h-100 shadow-sm border-0 overflow-hidden position-relative" 
                      style="border-left: 5px solid {% if request.status == 'Completed' %}#198754{% elif request.status == 'Pending' %}#ffc107{% endif %};">
+
+                    <!-- Patient ID Badge (Top Left) -->
+                    <div class="position-absolute top-0 start-0 m-2" style="z-index: 10; background: rgba(0,0,0,0.8); padding: 8px 14px; border-radius: 6px; color: white; font-weight: 700; font-size: 1.1rem;">
+                        <i class="fa-solid fa-id-card me-2"></i>{{ request.patient_id }}
+                    </div>
 
                     <div class="card-header bg-gradient p-3" style="background: linear-gradient(135deg, {% if request.status == 'Completed' %}#198754{% elif request.status == 'Pending' %}#ffc107{% endif %} 0%, {% if request.status == 'Completed' %}#157347{% elif request.status == 'Pending' %}#e0a800{% endif %} 100%); color: white;">
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
                                 {% if request.status == 'Completed' %}<i class="fa-solid fa-check-circle me-2"></i>{% else %}<i class="fa-solid fa-hourglass-end me-2"></i>{% endif %}
-                                {{ request.patient_id }}
+                                Status
                             </h5>
                             <span class="badge bg-white text-dark">{{ request.centre_name|truncatechars:20 }}</span>
                         </div>
@@ -77,6 +85,15 @@
                             <span class="badge {% if request.status == 'Completed' %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.85rem;">
                                 {{ request.status }}
                             </span>
+                            <br>
+                            <strong>Assignment:</strong>
+                            <span class="badge {% if request.assignment_status == 'Unassigned' %}bg-secondary{% elif request.assignment_status == 'Assigned' %}bg-info{% elif request.assignment_status == 'In Progress' %}bg-warning text-dark{% else %}bg-success{% endif %}" style="font-size: 0.85rem;">
+                                {{ request.assignment_status }}
+                            </span>
+                            {% if request.assigned_to %}
+                            <br>
+                            <em class="text-muted">Assigned to: {{ request.assigned_to.full_name }}</em>
+                            {% endif %}
                         </div>
 
                         {% if request.report_data %}
@@ -88,8 +105,13 @@
                         
                         <div class="d-grid gap-2">
                             <a href="{% url 'generate_report_pdf' request.pk %}" class="btn btn-success btn-sm">
-                                <i class="fa-solid fa-download me-1"></i> Download PDF Report
+                                <i class="fa-solid fa-download me-1"></i> Download Generated Report
                             </a>
+                            {% if request.report_data.microbiology_pdf %}
+                            <a href="{% url 'download_lab_pdf' request.pk %}" class="btn btn-info btn-sm">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Download Lab Report PDF
+                            </a>
+                            {% endif %}
                         </div>
 
                         {% else %}

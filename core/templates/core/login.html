@@ -102,29 +102,6 @@
             margin-bottom: 1.5rem;
         }
         
-        .demo-info {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-top: 2rem;
-        }
-        
-        .demo-info h6 {
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-        
-        .demo-info p {
-            font-size: 0.85rem;
-            margin-bottom: 0.5rem;
-            color: #555;
-        }
-        
-        .demo-info small {
-            color: #999;
-        }
     </style>
 </head>
 <body>
@@ -156,7 +133,7 @@
             
             <form method="post" novalidate>
                 {% csrf_token %}
-                
+
                 <div class="form-group">
                     <label for="id_username" class="form-label">Username</label>
                     <input type="text" class="form-control" id="id_username" name="username" placeholder="Enter your username" autofocus required>
@@ -164,7 +141,7 @@
                         <div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>
                     {% endif %}
                 </div>
-                
+
                 <div class="form-group">
                     <label for="id_password" class="form-label">Password</label>
                     <input type="password" class="form-control" id="id_password" name="password" placeholder="Enter your password" required>
@@ -172,20 +149,11 @@
                         <div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>
                     {% endif %}
                 </div>
-                
+
                 <button type="submit" class="btn btn-login">
                     <i class="fa-solid fa-sign-in-alt me-2"></i> Login
                 </button>
             </form>
-            
-            <!-- Demo Credentials Info -->
-            <div class="demo-info">
-                <h6><i class="fa-solid fa-circle-info"></i> Demo Credentials</h6>
-                <p><strong>Doctor Account:</strong></p>
-                <small>Username: <code>doctor</code> | Password: <code>demo123</code></small>
-                <p class="mt-2 mb-1"><strong>Lab Account:</strong></p>
-                <small>Username: <code>lab</code> | Password: <code>demo123</code></small>
-            </div>
         </div>
     </div>
 </div>

@@ -1,31 +1,181 @@
 <div class="modal fade" id="caseHistoryModal-{{ request_obj.id }}" tabindex="-1" aria-labelledby="caseHistoryLabel-{{ request_obj.id }}" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+  <div class="modal-dialog modal-dialog-scrollable modal-xl">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="caseHistoryLabel-{{ request_obj.id }}">Case History — {{ request_obj.patient_id }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="caseHistoryLabel-{{ request_obj.id }}">
+          <i class="fa-solid fa-file-medical me-2"></i>Case Details — Patient ID: <strong>{{ request_obj.patient_id }}</strong>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        {% if history_list %}
-          <ul class="list-group">
-            {% for h in history_list %}
-              <li class="list-group-item">
-                <div class="d-flex justify-content-between">
-                  <div>
-                    <strong>{{ h.action }}</strong>
-                    {% if h.user %} by <em>{{ h.user.full_name }}</em>{% endif %}
-                    <div class="small text-muted">{{ h.timestamp|date:"M d, Y H:i" }}</div>
-                    {% if h.note %}<div class="mt-2">{{ h.note }}</div>{% endif %}
-                  </div>
-                </div>
-              </li>
-            {% endfor %}
-          </ul>
+        
+        <!-- DOCTOR SUBMITTED DETAILS -->
+        <div class="card mb-4 border-left border-primary">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fa-solid fa-stethoscope me-2 text-primary"></i><strong>Doctor Submission Details</strong></h6>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Patient ID</label>
+                <p class="mb-0">{{ request_obj.patient_id }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Centre Name</label>
+                <p class="mb-0">{{ request_obj.centre_name }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Eye</label>
+                <p class="mb-0">{{ request_obj.get_eye_display }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Sample Type</label>
+                <p class="mb-0">{{ request_obj.get_sample_display }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Duration</label>
+                <p class="mb-0">{{ request_obj.duration_value }} {{ request_obj.get_duration_unit_display }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Clinical Impression</label>
+                <p class="mb-0">{{ request_obj.impression }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Stain Requested</label>
+                <p class="mb-0">
+                  {% if request_obj.stain %}
+                    <span class="badge bg-info">{{ request_obj.stain }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">N/A</span>
+                  {% endif %}
+                </p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Medications</label>
+                <p class="mb-0">
+                  {% if request_obj.on_meds %}
+                    {% if request_obj.meds_category == "Others" %}
+                      {{ request_obj.meds_custom }}
+                    {% else %}
+                      {{ request_obj.get_meds_category_display }}
+                    {% endif %}
+                  {% else %}
+                    <span class="badge bg-secondary">None</span>
+                  {% endif %}
+                </p>
+              </div>
+              <div class="col-12 mb-3">
+                <label class="fw-bold text-muted small">Submitted Date</label>
+                <p class="mb-0">{{ request_obj.timestamp|date:"M d, Y H:i" }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LAB TECH SUBMITTED DETAILS -->
+        {% if request_obj.report_data %}
+        <div class="card mb-4 border-left border-success">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fa-solid fa-flask-vial me-2 text-success"></i><strong>Lab Tech Report Details</strong></h6>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Lab ID</label>
+                <p class="mb-0">{{ request_obj.report_data.lab_id }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">RC Code</label>
+                <p class="mb-0">{{ request_obj.report_data.rc_code }}</p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Sample Quality</label>
+                <p class="mb-0">
+                  <span class="badge bg-warning text-dark">{{ request_obj.report_data.quality }}</span>
+                </p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Sample Suitability</label>
+                <p class="mb-0">
+                  {% if request_obj.report_data.sample_suitability %}
+                    <span class="badge bg-success">Yes</span>
+                  {% else %}
+                    <span class="badge bg-danger">No</span>
+                  {% endif %}
+                </p>
+              </div>
+              {% if not request_obj.report_data.sample_suitability %}
+              <div class="col-12 mb-3">
+                <label class="fw-bold text-muted small">Suitability Reason</label>
+                <p class="mb-0">{{ request_obj.report_data.suitability_reason }}</p>
+              </div>
+              {% endif %}
+              <div class="col-12 mb-3">
+                <label class="fw-bold text-muted small">Microbiology Report</label>
+                <p class="mb-0 text-break">{{ request_obj.report_data.report_text }}</p>
+              </div>
+              {% if request_obj.report_data.comments %}
+              <div class="col-12 mb-3">
+                <label class="fw-bold text-muted small">Additional Comments</label>
+                <p class="mb-0 text-break">{{ request_obj.report_data.comments }}</p>
+              </div>
+              {% endif %}
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Authorized By</label>
+                <p class="mb-0"><strong>{{ request_obj.report_data.auth_by }}</strong></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="fw-bold text-muted small">Report Completion Date</label>
+                <p class="mb-0">{{ request_obj.report_data.created_at|date:"M d, Y H:i" }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
         {% else %}
-          <div class="alert alert-secondary">No history entries available for this case.</div>
+        <div class="alert alert-warning">
+          <i class="fa-solid fa-hourglass-end me-2"></i><strong>Lab Report</strong> — Not yet completed by lab technician.
+        </div>
         {% endif %}
+
+        <!-- CASE HISTORY TIMELINE -->
+        <div class="card">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fa-solid fa-history me-2 text-info"></i><strong>Activity Timeline</strong></h6>
+          </div>
+          <div class="card-body">
+            {% if history_list %}
+              <ul class="list-group list-group-flush">
+                {% for h in history_list %}
+                  <li class="list-group-item">
+                    <div class="d-flex">
+                      <div class="me-3">
+                        <span class="badge bg-info rounded-pill" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                          <i class="fa-solid fa-circle-check"></i>
+                        </span>
+                      </div>
+                      <div class="flex-grow-1">
+                        <strong>{{ h.action }}</strong>
+                        {% if h.user %}<em class="text-muted"> — {{ h.user.full_name }}</em>{% endif %}
+                        <div class="small text-muted mt-1"><i class="fa-solid fa-clock me-1"></i>{{ h.timestamp|date:"M d, Y H:i" }}</div>
+                        {% if h.note %}<div class="small mt-2 text-dark">{{ h.note }}</div>{% endif %}
+                      </div>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="alert alert-secondary mb-0">No activity recorded for this case.</div>
+            {% endif %}
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
+        {% if request_obj.report_data %}
+        <a href="{% url 'generate_report_pdf' request_obj.pk %}" class="btn btn-success">
+          <i class="fa-solid fa-download me-2"></i> Download Report PDF
+        </a>
+        {% endif %}
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>

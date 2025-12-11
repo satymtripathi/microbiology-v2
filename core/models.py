@@ -39,6 +39,13 @@ class Request(models.Model):
         ('Completed', 'Report Completed'),
     )
     
+    ASSIGNMENT_STATUS_CHOICES = (
+        ('Unassigned', 'Unassigned'),
+        ('Assigned', 'Assigned'),
+        ('In Progress', 'In Progress'),
+        ('Completed', 'Completed'),
+    )
+    
     EYE_CHOICES = (
         ('OD', 'Right Eye (OD)'),
         ('OS', 'Left Eye (OS)'),
@@ -100,6 +107,12 @@ class Request(models.Model):
     # Technical & Status
     image = models.ImageField(upload_to='slides/%Y/%m/%d/') # Image storage
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    
+    # Assignment system
+    assigned_to = models.ForeignKey(PortalUser, on_delete=models.SET_NULL, null=True, blank=True, 
+                                   limit_choices_to={'role': 'Lab'}, related_name='assigned_requests')
+    assignment_status = models.CharField(max_length=20, choices=ASSIGNMENT_STATUS_CHOICES, default='Unassigned')
+    assigned_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-timestamp']
@@ -129,6 +142,11 @@ class Report(models.Model):
     comments = models.TextField(blank=True)
     
     auth_by = models.CharField(max_length=100)
+    
+    # Microbiology Report PDF (optional upload by lab tech)
+    microbiology_pdf = models.FileField(upload_to='reports/%Y/%m/%d/', blank=True, null=True, 
+                                        help_text="Upload the microbiology report PDF")
+    pdf_uploaded_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Report for {self.request.patient_id}"

@@ -11,6 +11,8 @@ from django.views import View
 from django.http import HttpResponse
 from io import BytesIO
 import os
+import csv
+from django.utils import timezone
 
 # ReportLab PDF Imports
 from reportlab.lib import colors 
@@ -50,6 +52,15 @@ def dashboard_view(request):
     return render(request, 'core/dashboard.html')
 
 
+@login_required
+def dashboard_view(request):
+    if request.user.is_doctor():
+        return redirect('doctor_submit')
+    elif request.user.is_lab():
+        return redirect('lab_queue')
+    return render(request, 'core/dashboard.html')
+
+
 # ==========================================
 # DOCTOR: SUBMIT REQUEST
 # ==========================================
@@ -62,20 +73,55 @@ def doctor_submit_view(request):
             new_request = form.save(commit=False)
             new_request.doctor = request.user
             new_request.status = 'Pending'
+            
+            # Handle lab tech assignment
+            assigned_to = form.cleaned_data.get('assigned_to')
+            lab_techs = PortalUser.objects.filter(role='Lab', is_active=True)
+            
+            if not lab_techs.exists():
+                # No lab techs available
+                messages.error(request, "Cannot submit request: No lab technicians available. Please contact administrator.")
+                return render(request, 'core/doctor_submit.html', {
+                    'form': form,
+                    'page_title': 'New Sample Submission',
+                    'total_cases': Request.objects.filter(doctor=request.user).count(),
+                    'pending_cases': Request.objects.filter(doctor=request.user, status='Pending').count(),
+                })
+            
+            if assigned_to:
+                # Doctor explicitly selected a lab tech
+                new_request.assigned_to = assigned_to
+                new_request.assignment_status = 'Assigned'
+                new_request.assigned_date = timezone.now()
+                assignment_msg = f"assigned to {assigned_to.full_name}"
+            else:
+                # Auto-assign to the least busy lab tech (fewest assigned pending cases)
+                least_busy = min(
+                    lab_techs,
+                    key=lambda tech: tech.assigned_requests.filter(
+                        status='Pending'
+                    ).count()
+                )
+                new_request.assigned_to = least_busy
+                new_request.assignment_status = 'Assigned'
+                new_request.assigned_date = timezone.now()
+                assignment_msg = f"auto-assigned to {least_busy.full_name} (least busy)"
+            
             new_request.save()
 
             # Record history entry for the new submission
             try:
+                assignment_note = f"Submitted by Dr. {request.user.full_name} and {assignment_msg}"
                 RequestHistory.objects.create(
                     request=new_request,
                     user=request.user,
                     action='Submitted',
-                    note=f"Submitted by Dr. {request.user.full_name}"
+                    note=assignment_note
                 )
             except Exception:
                 pass
 
-            messages.success(request, f"Request for Patient {new_request.patient_id} submitted successfully!")
+            messages.success(request, f"Request for Patient {new_request.patient_id} submitted successfully and {assignment_msg}!")
             return redirect('doctor_reports')
     else:
         form = DoctorRequestForm()
@@ -124,26 +170,34 @@ class LabQueueListView(LabRequiredMixin, ListView):
     context_object_name = 'pending_requests'
 
     def get_queryset(self):
-        return Request.objects.filter(status='Pending').order_by('timestamp')
+        # Show ONLY cases assigned to THIS lab tech
+        return Request.objects.filter(
+            status='Pending',
+            assigned_to=self.request.user
+        ).order_by('timestamp')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         for r in ctx['pending_requests']:
             r.history_list = list(r.history_entries.all()[:20])
         # Summary counts for header
-        ctx['total_cases'] = Request.objects.count()
+        ctx['total_cases'] = Request.objects.filter(assigned_to=self.request.user).count()
         ctx['pending_count'] = len(ctx['pending_requests'])
         return ctx
 
 
 class LabReportListView(LabRequiredMixin, ListView):
-    """List of completed reports for lab users."""
+    """List of completed reports for lab users - only those assigned to them."""
     model = Request
     template_name = 'core/lab_reports.html'
     context_object_name = 'reports'
 
     def get_queryset(self):
-        return Request.objects.filter(status='Completed').order_by('-timestamp')
+        # Show ONLY completed cases assigned to THIS lab tech
+        return Request.objects.filter(
+            status='Completed',
+            assigned_to=self.request.user
+        ).order_by('-timestamp')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -202,26 +256,38 @@ class LabReportListView(LabRequiredMixin, ListView):
 # ==========================================
 @login_required
 @user_passes_test(lambda u: u.is_lab(), login_url='login')
+@login_required
+@user_passes_test(lambda u: u.is_lab(), login_url='login')
 def lab_process_request(request, pk):
     request_obj = get_object_or_404(Request, pk=pk, status='Pending')
 
     if request.method == 'POST':
-        form = LabReportForm(request.POST)
+        form = LabReportForm(request.POST, request.FILES)
         if form.is_valid():
             report = form.save(commit=False)
             report.request = request_obj
+            
+            # Handle PDF upload
+            if 'microbiology_pdf' in request.FILES:
+                report.microbiology_pdf = request.FILES['microbiology_pdf']
+                report.pdf_uploaded_date = timezone.now()
+            
             report.save()
 
             request_obj.status = 'Completed'
+            request_obj.assignment_status = 'Completed'
             request_obj.save()
 
             # Record history entry for completion
             try:
+                pdf_note = ""
+                if report.microbiology_pdf:
+                    pdf_note = " (with PDF)"
                 RequestHistory.objects.create(
                     request=request_obj,
                     user=request.user,
                     action='Report Completed',
-                    note=f"Report authored by {report.auth_by}"
+                    note=f"Report authored by {report.auth_by}{pdf_note}"
                 )
             except Exception:
                 pass
@@ -422,4 +488,158 @@ def logout_user(request):
     messages.info(request, "You have been logged out.")
     return redirect('login')
 
+
+# ==========================================
+# ASSIGNMENT SYSTEM
+# ==========================================
+@login_required
+@user_passes_test(lambda u: u.is_lab(), login_url='login')
+def assign_case(request, pk):
+    """Assign a pending case to the current lab technician."""
+    case = get_object_or_404(Request, pk=pk, status='Pending', assignment_status='Unassigned')
+    
+    if request.method == 'POST':
+        case.assigned_to = request.user
+        case.assignment_status = 'Assigned'
+        case.assigned_date = timezone.now()
+        case.save()
+        
+        # Record history
+        try:
+            RequestHistory.objects.create(
+                request=case,
+                user=request.user,
+                action='Assigned',
+                note=f"Assigned to {request.user.full_name}"
+            )
+        except Exception:
+            pass
+        
+        messages.success(request, f"Case {case.patient_id} assigned to you.")
+        return redirect('lab_queue')
+    
+    return render(request, 'core/confirm_assign.html', {'case': case})
+
+
+# ==========================================
+# CSV EXPORT
+# ==========================================
+@login_required
+@user_passes_test(lambda u: u.is_doctor(), login_url='login')
+def export_doctor_csv(request):
+    """Export all cases submitted by the doctor to CSV with lab details for completed ones."""
+    cases = Request.objects.filter(doctor=request.user).order_by('-timestamp')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="doctor_cases_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    # Enhanced headers with lab details
+    writer.writerow([
+        'Patient ID', 'Centre', 'Eye', 'Sample Type', 'Duration', 'Impression', 'Stain', 
+        'Status', 'Assigned Lab Tech', 'Lab ID', 'RC Code', 'Quality', 'Suitability', 
+        'Report Text', 'Authorized By', 'Submitted Date'
+    ])
+    
+    for case in cases:
+        # Get lab report if available
+        try:
+            report = case.report
+            lab_id = report.lab_id
+            rc_code = report.rc_code
+            quality = report.quality
+            suitability = "Yes" if report.sample_suitability else "No"
+            report_text = report.report_text[:200]  # First 200 chars
+            auth_by = report.auth_by
+        except Report.DoesNotExist:
+            lab_id = 'N/A'
+            rc_code = 'N/A'
+            quality = 'N/A'
+            suitability = 'N/A'
+            report_text = 'N/A'
+            auth_by = 'N/A'
+        
+        assigned_tech = case.assigned_to.full_name if case.assigned_to else 'Unassigned'
+        
+        writer.writerow([
+            case.patient_id,
+            case.centre_name,
+            case.get_eye_display(),
+            case.get_sample_display(),
+            f"{case.duration_value} {case.get_duration_unit_display()}",
+            case.get_impression_display(),
+            case.stain or 'N/A',
+            case.status,
+            assigned_tech,
+            lab_id,
+            rc_code,
+            quality,
+            suitability,
+            report_text,
+            auth_by,
+            case.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+    
+    return response
+
+
+@login_required
+@user_passes_test(lambda u: u.is_lab(), login_url='login')
+def export_lab_csv(request):
+    """Export all cases assigned to the lab technician to CSV."""
+    cases = Request.objects.filter(assigned_to=request.user).order_by('-timestamp')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="lab_cases_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Patient ID', 'Doctor', 'Centre', 'Eye', 'Sample Type', 'Duration', 'Impression', 'Stain', 'Status', 'Assigned Date', 'Status'])
+    
+    for case in cases:
+        doctor_name = case.doctor.full_name if case.doctor else 'Unknown'
+        writer.writerow([
+            case.patient_id,
+            doctor_name,
+            case.centre_name,
+            case.get_eye_display(),
+            case.get_sample_display(),
+            f"{case.duration_value} {case.get_duration_unit_display()}",
+            case.get_impression_display(),
+            case.stain or 'N/A',
+            case.status,
+            case.assigned_date.strftime('%Y-%m-%d %H:%M:%S') if case.assigned_date else 'N/A',
+            case.assignment_status,
+        ])
+    
+    return response
+
+
+# ==========================================
+# DOWNLOAD LAB PDF
+# ==========================================
+@login_required
+@user_passes_test(lambda u: u.is_doctor(), login_url='login')
+def download_lab_pdf(request, pk):
+    """Download the microbiology report PDF uploaded by lab tech."""
+    case = get_object_or_404(Request, pk=pk, doctor=request.user, status='Completed')
+    
+    try:
+        report = case.report
+    except Report.DoesNotExist:
+        messages.error(request, "Report not found for this case.")
+        return redirect('doctor_reports')
+    
+    if not report.microbiology_pdf:
+        messages.error(request, "No PDF has been uploaded for this report yet.")
+        return redirect('doctor_reports')
+    
+    # Serve the PDF file
+    if os.path.exists(report.microbiology_pdf.path):
+        with open(report.microbiology_pdf.path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="microbio_report_{case.patient_id}.pdf"'
+            return response
+    else:
+        messages.error(request, "PDF file not found on server.")
+        return redirect('doctor_reports')
 

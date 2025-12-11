@@ -29,8 +29,19 @@ urlpatterns = [
     # 2. Process Request (Detail/Creation)
     path('lab/process/<int:pk>/', views.lab_process_request, name='lab_process'), 
     
-    # 3. Generate PDF Report
+    # 3. Assignment system
+    path('lab/assign/<int:pk>/', views.assign_case, name='assign_case'),
+    
+    # 4. CSV Export
+    path('doctor/export-csv/', views.export_doctor_csv, name='export_doctor_csv'),
+    path('lab/export-csv/', views.export_lab_csv, name='export_lab_csv'),
+    
+    # 5. Generate PDF Report
     path('report/pdf/<int:pk>/', views.generate_report_pdf, name='generate_report_pdf'),
-    # Lab reports (for lab users)
+    
+    # 6. Download Lab Uploaded PDF
+    path('report/download-pdf/<int:pk>/', views.download_lab_pdf, name='download_lab_pdf'),
+    
+    # 7. Lab reports (for lab users)
     path('lab/reports/', LabReportListView.as_view(), name='lab_reports'),
 ]

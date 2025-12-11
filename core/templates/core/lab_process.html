@@ -105,7 +105,7 @@
 <div class="card-header bg-primary text-white p-2"><b>Lab Report</b></div>
 <div class="card-body">
 
-<form method="post" novalidate>
+<form method="post" enctype="multipart/form-data" novalidate>
 {% csrf_token %}
 {{ form|crispy }}
 

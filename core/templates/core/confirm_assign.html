@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Confirm Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white p-4">
+                    <h4 class="mb-0"><i class="fa-solid fa-hand-holding-heart me-2"></i>Confirm Case Assignment</h4>
+                </div>
+                <div class="card-body p-5">
+                    <div class="alert alert-info mb-4">
+                        <i class="fa-solid fa-info-circle me-2"></i>
+                        You are about to assign this case to yourself. After assignment, you will have exclusive access to process this sample.
+                    </div>
+
+                    <div class="bg-light p-4 rounded mb-4">
+                        <h6 class="text-primary mb-3"><i class="fa-solid fa-flask-vial me-2"></i>Case Details</h6>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Patient ID</small>
+                                <p class="mb-0"><strong>{{ case.patient_id }}</strong></p>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Centre</small>
+                                <p class="mb-0"><strong>{{ case.centre_name }}</strong></p>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Eye</small>
+                                <p class="mb-0"><strong>{{ case.get_eye_display }}</strong></p>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Sample Type</small>
+                                <p class="mb-0"><strong>{{ case.get_sample_display }}</strong></p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">Doctor</small>
+                                <p class="mb-0"><strong>{{ case.doctor.full_name }}</strong></p>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Duration</small>
+                                <p class="mb-0"><strong>{{ case.duration_value }} {{ case.get_duration_unit_display }}</strong></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" class="d-grid gap-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fa-solid fa-check me-2"></i>Confirm Assignment
+                        </button>
+                        <a href="{% url 'lab_queue' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fa-solid fa-times me-2"></i>Cancel
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

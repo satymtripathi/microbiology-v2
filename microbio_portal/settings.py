@@ -26,7 +26,11 @@ SECRET_KEY = "django-insecure-!r4^(zkedjm7gdir_)vd*-h-z^+pl3wva7o5%5_gfvbbdn0!yk
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'microbiology-v2.onrender.com',
+]
 
 
 # Application definition
